@@ -44,6 +44,42 @@ def append_return(lst, x):
     return lst
 
 
+def test_sliding_window_very_simple_aggregation_flow():
+    controller = build_flow(
+        [
+            SyncEmitSource(),
+            AggregateByKey(
+                [
+                    FieldAggregator(
+                        "my_counter",
+                        "my_col",
+                        ["count"],
+                        SlidingWindows(["20m"], "10m"),
+                    )
+                ],
+                Table("test", NoopDriver()),
+                time_field="time",
+            ),
+            Reduce([], lambda acc, x: append_return(acc, x)),
+        ]
+    ).run()
+
+
+    test_base_time = datetime.fromisoformat("2020-07-21T21:40:00+00:00")
+    num_events = 20
+    for i in range( num_events):
+        data = {"my_col": 1, "event-id": i + 1, "time": test_base_time + timedelta(minutes= 5 * i)}
+        controller.emit(element = data, key = "my_key")
+
+
+    controller.terminate()
+    actual = controller.await_termination()
+
+    print()
+    for i in range(num_events):
+        print(actual[i])
+
+
 def test_sliding_window_simple_aggregation_flow():
     controller = build_flow(
         [
